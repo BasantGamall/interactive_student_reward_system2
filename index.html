@@ -1,0 +1,836 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Magical Student Reward Chest</title>
+    <!-- Tailwind CSS for modern responsive styling -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Google Fonts: Poppins for child-friendly typography -->
+    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;600;700;800&display=swap" rel="stylesheet">
+    <!-- FontAwesome for icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <!-- Canvas Confetti for celebration effects -->
+    <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.5.1/dist/confetti.browser.min.js"></script>
+    <style>
+        body {
+            font-family: 'Poppins', sans-serif;
+            background: linear-gradient(135deg, #fbcfe8 0%, #a7f3d0 50%, #bfdbfe 100%);
+            background-attachment: fixed;
+        }
+        .glow-box {
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.1), inset 0 2px 5px rgba(255, 255, 255, 0.8);
+        }
+        .bounce-hover:hover {
+            transform: scale(1.05);
+            transition: transform 0.2s ease-in-out;
+        }
+        @keyframes popIn {
+            0% { transform: scale(0.5); opacity: 0; }
+            100% { transform: scale(1); opacity: 1; }
+        }
+        .animate-pop {
+            animation: popIn 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards;
+        }
+    </style>
+</head>
+<body class="min-h-screen text-gray-800 flex flex-col justify-between">
+
+    <header class="bg-white/80 backdrop-blur-md shadow-md py-4 px-6 sticky top-0 z-40 border-b border-indigo-100">
+        <div class="max-w-7xl mx-auto flex flex-col sm:flex-row items-center justify-between gap-4">
+            <div class="flex items-center gap-3">
+                <div class="w-12 h-12 bg-gradient-to-tr from-yellow-400 to-pink-500 rounded-2xl flex items-center justify-center text-white text-2xl shadow-lg animate-pulse">
+                    <i class="fa-solid fa-star"></i>
+                </div>
+                <div>
+                    <h1 class="text-2xl font-extrabold bg-gradient-to-r from-purple-600 to-pink-600 bg-clip-text text-transparent">Magical Star Chest</h1>
+                    <p class="text-xs text-gray-500 font-medium">Student: <span id="currentStudentNameDisplay" class="font-bold text-indigo-600">Guest</span> (<span id="studentStatusBadge" class="text-purple-600 font-bold">New</span>)</p>
+                </div>
+            </div>
+
+            <!-- Right Controls: Lifetime Points & Switch Student -->
+            <div class="flex items-center gap-3 flex-wrap justify-center">
+                <!-- Top-Right Total Accumulated Lifetime Points Counter -->
+                <div class="bg-amber-50 border border-amber-200 px-4 py-2 rounded-2xl shadow-sm flex items-center gap-3">
+                    <div class="w-8 h-8 rounded-xl bg-amber-400 text-white flex items-center justify-center font-black text-sm shadow-sm">
+                        <i class="fa-solid fa-trophy"></i>
+                    </div>
+                    <div class="text-left">
+                        <div class="text-[10px] text-amber-600 font-bold uppercase tracking-wider">Total Lifetime Points</div>
+                        <div id="lifetimePointsDisplay" class="text-lg font-black text-amber-700">0</div>
+                    </div>
+                </div>
+
+                <button onclick="openStudentModal()" class="bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-xs px-4 py-3 rounded-2xl shadow-md transition flex items-center gap-2">
+                    <i class="fa-solid fa-user-gear"></i> Change Student
+                </button>
+
+                <button onclick="deleteCurrentStudent()" class="bg-rose-500 hover:bg-rose-600 text-white font-bold text-xs px-3 py-3 rounded-2xl shadow-md transition flex items-center gap-2" title="Delete current student profile">
+                    <i class="fa-solid fa-trash-can"></i> Delete Profile
+                </button>
+
+                <button onclick="exportBackup()" class="bg-emerald-500 hover:bg-emerald-600 text-white font-bold text-xs px-3 py-3 rounded-2xl shadow-md transition flex items-center gap-2" title="Download a backup copy of all students' data">
+                    <i class="fa-solid fa-download"></i> Backup
+                </button>
+                <button onclick="triggerRestore()" class="bg-sky-500 hover:bg-sky-600 text-white font-bold text-xs px-3 py-3 rounded-2xl shadow-md transition flex items-center gap-2" title="Restore data from a backup file">
+                    <i class="fa-solid fa-upload"></i> Restore
+                </button>
+                <input type="file" id="restoreFileInput" accept=".json,application/json" class="hidden" onchange="importBackup(event)" />
+            </div>
+        </div>
+    </header>
+
+    <!-- Student Files Bar: each student has a separate profile (points + sticker vault) -->
+    <nav class="max-w-7xl mx-auto w-full px-4 sm:px-6 pt-4">
+        <div class="bg-white/80 backdrop-blur rounded-2xl border border-white shadow-sm p-2 flex items-center gap-2 overflow-x-auto">
+            <span class="text-[10px] font-bold text-gray-500 uppercase tracking-wider px-2 whitespace-nowrap"><i class="fa-solid fa-folder-open mr-1"></i> Student Files</span>
+            <div id="studentTabs" class="flex items-center gap-2"></div>
+            <button onclick="openStudentModal()" class="whitespace-nowrap bg-indigo-50 hover:bg-indigo-100 text-indigo-700 border border-dashed border-indigo-300 font-bold text-xs px-3 py-2 rounded-xl transition flex items-center gap-1">
+                <i class="fa-solid fa-user-plus"></i> New Student
+            </button>
+        </div>
+    </nav>
+
+    <div id="studentModal" class="fixed inset-0 bg-black/60 backdrop-blur-md z-50 flex items-center justify-center p-4">
+        <div class="bg-white rounded-3xl max-w-md w-full p-6 sm:p-8 text-center animate-pop shadow-2xl border-4 border-indigo-100">
+            <div class="w-16 h-16 mx-auto rounded-2xl bg-indigo-100 text-indigo-600 flex items-center justify-center text-3xl mb-4 shadow-inner">
+                <i class="fa-solid fa-graduation-cap"></i>
+            </div>
+            <h3 class="text-2xl font-black mb-2 text-gray-800">Welcome Student!</h3>
+            <p class="text-gray-500 text-xs sm:text-sm mb-6">Enter your name to load your personal reward chest and sticker vault.</p>
+            
+            <div class="mb-4 text-left">
+                <label class="block text-xs font-bold text-gray-600 mb-1">Student Name (e.g. Naya, Ahmed):</label>
+                <input type="text" id="studentNameInput" placeholder="Enter student name" class="w-full px-4 py-3 rounded-2xl border-2 border-indigo-200 focus:outline-none focus:border-indigo-500 font-semibold text-gray-700 shadow-sm" />
+            </div>
+
+            <div id="existingStudentsContainer" class="mb-6 text-left hidden">
+                <label class="block text-xs font-bold text-gray-600 mb-1">Or select existing student:</label>
+                <select id="existingStudentsSelect" onchange="selectExistingStudentDropdown(this.value)" class="w-full px-4 py-3 rounded-2xl border-2 border-indigo-100 bg-gray-50 focus:outline-none font-semibold text-gray-700 text-sm">
+                    <option value="">-- Choose Profile --</option>
+                </select>
+            </div>
+
+            <button onclick="handleStudentSubmit()" class="w-full bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-700 hover:to-purple-700 text-white font-extrabold py-3.5 rounded-2xl shadow-lg shadow-indigo-200 transition">
+                Start Session <i class="fa-solid fa-arrow-right ml-2"></i>
+            </button>
+        </div>
+    </div>
+
+    <main class="max-w-7xl mx-auto w-full p-4 sm:p-6 grid grid-cols-1 lg:grid-cols-3 gap-6 flex-grow">
+        
+        <!-- Left/Center Column: Point Box & Quick Actions -->
+        <div class="lg:col-span-2 flex flex-col gap-6">
+            
+            <!-- Central Point Box -->
+            <div class="bg-white/90 backdrop-blur rounded-3xl p-6 sm:p-8 glow-box border border-white flex flex-col items-center justify-center text-center relative overflow-hidden">
+                <div class="absolute -top-12 -left-12 w-32 h-32 bg-pink-200 rounded-full mix-blend-multiply filter blur-xl opacity-75"></div>
+                <div class="absolute -bottom-12 -right-12 w-32 h-32 bg-purple-200 rounded-full mix-blend-multiply filter blur-xl opacity-75"></div>
+
+                <div class="flex items-center justify-between w-full mb-2">
+                    <h2 class="text-sm font-bold text-gray-500 uppercase tracking-wide">Today's Session Points</h2>
+                    <button onclick="resetSessionPoints()" class="text-xs bg-rose-50 text-rose-500 hover:bg-rose-500 hover:text-white font-bold px-3 py-1 rounded-xl border border-rose-200 transition shadow-sm">
+                        <i class="fa-solid fa-rotate-right mr-1"></i> Reset Points
+                    </button>
+                </div>
+                
+                <!-- Main Control Row with (-) and (+) buttons -->
+                <div class="flex items-center justify-center gap-4 sm:gap-8 my-4">
+                    <button onclick="adjustPoints(-1)" class="w-14 h-14 sm:w-16 sm:h-16 rounded-2xl bg-rose-500 hover:bg-rose-600 text-white text-2xl font-bold shadow-lg shadow-rose-300 bounce-hover flex items-center justify-center transition" title="Decrease points (-)">
+                        <i class="fa-solid fa-minus"></i>
+                    </button>
+                    
+                    <div class="bg-gradient-to-b from-indigo-50 to-purple-50 border-4 border-indigo-200 rounded-3xl px-8 py-4 sm:px-12 sm:py-6 shadow-inner min-w-[160px] sm:min-w-[200px]">
+                        <span id="currentPoints" class="text-5xl sm:text-7xl font-black bg-gradient-to-r from-indigo-600 to-purple-600 bg-clip-text text-transparent">0</span>
+                        <div class="text-xs text-purple-600 font-bold mt-1 uppercase">Points</div>
+                    </div>
+
+                    <button onclick="adjustPoints(1)" class="w-14 h-14 sm:w-16 sm:h-16 rounded-2xl bg-emerald-500 hover:bg-emerald-600 text-white text-2xl font-bold shadow-lg shadow-emerald-300 bounce-hover flex items-center justify-center transition" title="Increase points (+)">
+                        <i class="fa-solid fa-plus"></i>
+                    </button>
+                </div>
+
+                <p class="text-xs sm:text-sm text-gray-500 mt-2">Target to unlock reward: <span class="font-bold text-indigo-600">35 Points</span> (35 and above)</p>
+
+                <!-- Submit Button -->
+                <button onclick="submitSession()" class="mt-6 w-full max-w-md bg-gradient-to-r from-amber-400 via-orange-500 to-pink-500 hover:from-amber-500 hover:to-pink-600 text-white font-extrabold text-lg sm:text-xl py-4 px-8 rounded-2xl shadow-xl shadow-orange-300 bounce-hover transition flex items-center justify-center gap-3">
+                    <i class="fa-solid fa-flag-checkered text-2xl"></i> Submit Session & Unlock Sticker!
+                </button>
+            </div>
+
+            <!-- Quick Scoring Action Buttons (Achievements) -->
+            <div class="bg-white/90 backdrop-blur rounded-3xl p-6 glow-box border border-white">
+                <h3 class="text-md font-bold text-gray-700 mb-4 flex items-center gap-2">
+                    <i class="fa-solid fa-award text-amber-500"></i> Quick Achievement Scoring
+                </h3>
+                <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+                    <button onclick="addAchievement(5, 'Attendance (On time)')" class="bg-blue-50 hover:bg-blue-100 border border-blue-200 p-3 rounded-2xl text-left transition flex items-center justify-between group">
+                        <div>
+                            <div class="font-bold text-blue-900 text-sm">On-Time Attendance</div>
+                            <div class="text-xs text-blue-600">+5 Points</div>
+                        </div>
+                        <div class="w-9 h-9 bg-blue-500 text-white rounded-xl flex items-center justify-center font-bold group-hover:scale-110 transition shadow-sm">+5</div>
+                    </button>
+
+                    <button onclick="addAchievement(5, 'Focus & Attention')" class="bg-indigo-50 hover:bg-indigo-100 border border-indigo-200 p-3 rounded-2xl text-left transition flex items-center justify-between group">
+                        <div>
+                            <div class="font-bold text-indigo-900 text-sm">Focus & Attention</div>
+                            <div class="text-xs text-indigo-600">+5 Points</div>
+                        </div>
+                        <div class="w-9 h-9 bg-indigo-500 text-white rounded-xl flex items-center justify-center font-bold group-hover:scale-110 transition shadow-sm">+5</div>
+                    </button>
+
+                    <button onclick="addAchievement(1, 'Correct Answer')" class="bg-emerald-50 hover:bg-emerald-100 border border-emerald-200 p-3 rounded-2xl text-left transition flex items-center justify-between group">
+                        <div>
+                            <div class="font-bold text-emerald-900 text-sm">Correct Answer</div>
+                            <div class="text-xs text-emerald-600">+1 Point / question</div>
+                        </div>
+                        <div class="w-9 h-9 bg-emerald-500 text-white rounded-xl flex items-center justify-center font-bold group-hover:scale-110 transition shadow-sm">+1</div>
+                    </button>
+
+                    <button onclick="addAchievement(10, 'Verse Memorization')" class="bg-amber-50 hover:bg-amber-100 border border-amber-200 p-3 rounded-2xl text-left transition flex items-center justify-between group">
+                        <div>
+                            <div class="font-bold text-amber-900 text-sm">Verse Memorization</div>
+                            <div class="text-xs text-amber-600">+10 Points / verse</div>
+                        </div>
+                        <div class="w-9 h-9 bg-amber-500 text-white rounded-xl flex items-center justify-center font-bold group-hover:scale-110 transition shadow-sm">+10</div>
+                    </button>
+
+                    <button onclick="addAchievement(15, 'Full Surah Memorization')" class="bg-purple-50 hover:bg-purple-100 border border-purple-200 p-3 rounded-2xl text-left transition flex items-center justify-between group sm:col-span-2 lg:col-span-2">
+                        <div>
+                            <div class="font-bold text-purple-900 text-sm">Full Surah Memorization</div>
+                            <div class="text-xs text-purple-600">+15 Points</div>
+                        </div>
+                        <div class="w-9 h-9 bg-purple-500 text-white rounded-xl flex items-center justify-center font-bold group-hover:scale-110 transition shadow-sm">+15</div>
+                    </button>
+
+                    <button onclick="addAchievement(5, 'New Memorization Recitation')" class="bg-teal-50 hover:bg-teal-100 border border-teal-200 p-3 rounded-2xl text-left transition flex items-center justify-between group">
+                        <div>
+                            <div class="font-bold text-teal-900 text-sm">New Memorization Recitation</div>
+                            <div class="text-xs text-teal-600">+5 Points</div>
+                        </div>
+                        <div class="w-9 h-9 bg-teal-500 text-white rounded-xl flex items-center justify-center font-bold group-hover:scale-110 transition shadow-sm">+5</div>
+                    </button>
+
+                    <button onclick="addAchievement(5, 'Revision Recitation')" class="bg-rose-50 hover:bg-rose-100 border border-rose-200 p-3 rounded-2xl text-left transition flex items-center justify-between group">
+                        <div>
+                            <div class="font-bold text-rose-900 text-sm">Revision Recitation</div>
+                            <div class="text-xs text-rose-600">+5 Points</div>
+                        </div>
+                        <div class="w-9 h-9 bg-rose-500 text-white rounded-xl flex items-center justify-center font-bold group-hover:scale-110 transition shadow-sm">+5</div>
+                    </button>
+
+                    <button onclick="addAchievement(7, 'Previous Class Homework')" class="bg-orange-50 hover:bg-orange-100 border border-orange-200 p-3 rounded-2xl text-left transition flex items-center justify-between group sm:col-span-2 lg:col-span-1">
+                        <div>
+                            <div class="font-bold text-orange-900 text-sm">Previous Class Homework</div>
+                            <div class="text-xs text-orange-600">+7 Points</div>
+                        </div>
+                        <div class="w-9 h-9 bg-orange-500 text-white rounded-xl flex items-center justify-center font-bold group-hover:scale-110 transition shadow-sm">+7</div>
+                    </button>
+                </div>
+            </div>
+
+        </div>
+
+        <div class="flex flex-col gap-6">
+            <div class="bg-white/90 backdrop-blur rounded-3xl p-6 glow-box border border-white flex flex-col h-full">
+                <div class="flex items-center justify-between mb-2">
+                    <h3 class="text-lg font-bold text-gray-800 flex items-center gap-2">
+                        <i class="fa-solid fa-box-archive text-purple-600"></i> Sticker Vault
+                    </h3>
+                    <span id="inventoryCount" class="bg-purple-100 text-purple-700 text-xs font-extrabold px-3 py-1 rounded-full">0 Unlocked</span>
+                </div>
+                <p class="text-xs text-gray-500 mb-3">Upload stickers from your device. They stay locked until the student reaches the target.</p>
+                
+                <!-- Add Custom Sticker from Device Button -->
+                <button onclick="triggerDeviceUpload()" class="mb-4 bg-purple-50 hover:bg-purple-100 text-purple-700 border border-purple-200 font-bold text-xs py-3 px-4 rounded-2xl transition flex items-center justify-center gap-2 shadow-sm">
+                    <i class="fa-solid fa-cloud-arrow-up text-sm"></i> + Add Sticker from Device
+                </button>
+                <input type="file" id="deviceStickerFileInput" accept="image/*" class="hidden" onchange="handleDeviceFileUpload(event)" />
+
+                <div id="stickerInventory" class="grid grid-cols-2 gap-3 overflow-y-auto max-h-[380px] p-2 flex-grow bg-gray-50/50 rounded-2xl border border-gray-100">
+                    <!-- Dynamically populated stickers with delete option -->
+                </div>
+
+                <div class="mt-4 pt-4 border-t border-gray-100">
+                    <div class="text-xs font-bold text-gray-600 mb-2 uppercase">Today's Mystery Reward Sticker:</div>
+                    <div id="sessionStickerCard" class="relative rounded-2xl overflow-hidden border-2 border-dashed border-indigo-300 p-4 min-h-[150px] bg-indigo-50/40 flex flex-col items-center justify-center text-center">
+                        <div id="lockedOverlay" class="absolute inset-0 bg-white/70 backdrop-blur-sm flex flex-col items-center justify-center z-10 transition-all duration-300">
+                            <i class="fa-solid fa-lock text-3xl text-purple-600 mb-1"></i>
+                            <span id="lockedOverlayText" class="text-xs font-bold text-purple-800">Locked (Target: 35+)</span>
+                        </div>
+                        <img id="currentSessionStickerImg" src="" alt="Session Sticker" class="w-24 h-24 object-contain rounded-xl shadow-md filter blur-sm">
+                        <span id="currentSessionStickerTitle" class="text-xs font-bold text-gray-700 mt-2">No reward sticker added yet</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+    </main>
+
+    <div id="resultModal" class="fixed inset-0 bg-black/60 backdrop-blur-md z-50 flex items-center justify-center p-4 hidden">
+        <div class="bg-white rounded-3xl max-w-md w-full p-6 sm:p-8 text-center animate-pop shadow-2xl relative overflow-hidden border-4 border-indigo-100">
+            
+            <div id="modalIconContainer" class="w-20 h-20 mx-auto rounded-full flex items-center justify-center text-4xl mb-4 shadow-lg"></div>
+
+            <h3 id="modalTitle" class="text-2xl sm:text-3xl font-black mb-2"></h3>
+            <p id="modalMessage" class="text-gray-600 text-sm sm:text-base mb-6"></p>
+
+            <div id="modalStickerContainer" class="mb-6 hidden flex flex-col items-center">
+                <div class="relative rounded-2xl p-3 bg-gradient-to-tr from-amber-100 to-pink-100 border-2 border-amber-300 shadow-lg">
+                    <img id="modalStickerImg" src="" alt="Unlocked Sticker" class="w-32 h-32 object-contain rounded-xl">
+                </div>
+                <span class="text-xs font-bold text-purple-600 mt-2">Saved to your Sticker Vault!</span>
+            </div>
+
+            <button onclick="closeModal()" class="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-extrabold py-3 rounded-2xl shadow-lg shadow-indigo-200 transition">
+                Awesome! Continue
+            </button>
+        </div>
+    </div>
+
+    <!-- Full-screen sticker reveal -->
+    <div id="stickerRevealOverlay" class="fixed inset-0 z-[60] bg-gradient-to-br from-indigo-900/95 via-purple-900/95 to-pink-800/95 backdrop-blur-md flex flex-col items-center justify-center p-6 text-center hidden">
+        <h3 id="revealTitle" class="text-3xl sm:text-5xl font-black text-white mb-2 animate-pop"></h3>
+        <p id="revealMessage" class="text-white/90 text-sm sm:text-lg mb-6 max-w-xl"></p>
+        <div class="rounded-3xl p-4 bg-gradient-to-tr from-amber-100 to-pink-100 border-4 border-amber-300 shadow-2xl animate-pop">
+            <img id="revealStickerImg" src="" alt="Unlocked Sticker" class="max-h-[50vh] max-w-[80vw] object-contain rounded-2xl">
+        </div>
+        <span class="text-sm font-bold text-amber-200 mt-4">Saved to your Sticker Vault!</span>
+        <button onclick="closeStickerReveal()" class="mt-6 bg-white text-indigo-700 hover:bg-indigo-50 font-extrabold py-3 px-10 rounded-2xl shadow-lg transition">
+            Awesome! Continue
+        </button>
+    </div>
+
+    <footer class="text-center py-4 text-xs text-gray-500">
+        Interactive Student Reward System &bull; Designed for Inspiring Young Learners
+    </footer>
+
+    <script>
+        // Web Audio API Sound Synthesizer
+        const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+
+        function playSound(type) {
+            if (!audioCtx) return;
+            if (audioCtx.state === 'suspended') {
+                audioCtx.resume();
+            }
+
+            const osc = audioCtx.createOscillator();
+            const gainNode = audioCtx.createGain();
+            osc.connect(gainNode);
+            gainNode.connect(audioCtx.destination);
+
+            const now = audioCtx.currentTime;
+
+            if (type === 'click') {
+                osc.type = 'sine';
+                osc.frequency.setValueAtTime(400, now);
+                osc.frequency.exponentialRampToValueAtTime(800, now + 0.08);
+                gainNode.gain.setValueAtTime(0.15, now);
+                gainNode.gain.exponentialRampToValueAtTime(0.01, now + 0.08);
+                osc.start(now);
+                osc.stop(now + 0.08);
+            } else if (type === 'add') {
+                osc.type = 'triangle';
+                osc.frequency.setValueAtTime(523.25, now);
+                osc.frequency.setValueAtTime(659.25, now + 0.08);
+                osc.frequency.setValueAtTime(783.99, now + 0.16);
+                gainNode.gain.setValueAtTime(0.15, now);
+                gainNode.gain.exponentialRampToValueAtTime(0.01, now + 0.3);
+                osc.start(now);
+                osc.stop(now + 0.3);
+            } else if (type === 'success') {
+                const notes = [523.25, 659.25, 783.99, 1046.50];
+                notes.forEach((freq, idx) => {
+                    const o = audioCtx.createOscillator();
+                    const g = audioCtx.createGain();
+                    o.connect(g);
+                    g.connect(audioCtx.destination);
+                    o.type = 'sine';
+                    o.frequency.setValueAtTime(freq, now + (idx * 0.1));
+                    g.gain.setValueAtTime(0.2, now + (idx * 0.1));
+                    g.gain.exponentialRampToValueAtTime(0.01, now + (idx * 0.1) + 0.4);
+                    o.start(now + (idx * 0.1));
+                    o.stop(now + (idx * 0.1) + 0.4);
+                });
+            } else if (type === 'error') {
+                osc.type = 'sawtooth';
+                osc.frequency.setValueAtTime(250, now);
+                osc.frequency.exponentialRampToValueAtTime(150, now + 0.2);
+                gainNode.gain.setValueAtTime(0.2, now);
+                gainNode.gain.exponentialRampToValueAtTime(0.01, now + 0.2);
+                osc.start(now);
+                osc.stop(now + 0.2);
+            }
+        }
+
+        // Multi-Student Database management via localStorage
+        function safeLoadStudents() {
+            try { return JSON.parse(localStorage.getItem('all_students_db')) || {}; }
+            catch (err) { return {}; }
+        }
+        function safeLoadActiveName() {
+            try { return localStorage.getItem('active_student_name') || ''; }
+            catch (err) { return ''; }
+        }
+        let allStudents = safeLoadStudents();
+        let currentStudentName = safeLoadActiveName();
+
+        // Ask the browser not to clear saved data automatically
+        if (navigator.storage && navigator.storage.persist) {
+            navigator.storage.persist().catch(() => {});
+        }
+
+        // Clean up: remove any stickers the program used to add automatically in older versions,
+        // and make sure every student has a queue of locked (pending) stickers.
+        const AUTO_STICKER_IDS = ['naya_exclusive_sticker', 'sticker_default_1', 'sticker_1', 'sticker_2', 'sticker_3', 'sticker_4'];
+        function normalizeStudent(st) {
+            st.stickers = (st.stickers || []).filter(x => !AUTO_STICKER_IDS.includes(x.id));
+            if (!Array.isArray(st.pendingStickers)) st.pendingStickers = [];
+            // Older data counted session points inside Total Lifetime Points live; now they are added only on Submit
+            if (!st.lifetimeOnSubmit) {
+                st.lifetimePoints = Math.max(0, (st.lifetimePoints || 0) - (st.currentPoints || 0));
+                st.lifetimeOnSubmit = true;
+            }
+        }
+        Object.values(allStudents).forEach(normalizeStudent);
+        try { localStorage.setItem('all_students_db', JSON.stringify(allStudents)); } catch (err) {}
+
+        window.onload = function() {
+            checkExistingStudentsDropdown();
+            if (currentStudentName && allStudents[currentStudentName]) {
+                document.getElementById('studentModal').classList.add('hidden');
+                updateUI();
+            } else {
+                document.getElementById('studentModal').classList.remove('hidden');
+            }
+        };
+
+        function checkExistingStudentsDropdown() {
+            const selectEl = document.getElementById('existingStudentsSelect');
+            const containerEl = document.getElementById('existingStudentsContainer');
+            const studentKeys = Object.keys(allStudents);
+
+            if (studentKeys.length > 0) {
+                containerEl.classList.remove('hidden');
+                selectEl.innerHTML = '<option value="">-- Choose Profile --</option>';
+                studentKeys.forEach(name => {
+                    const opt = document.createElement('option');
+                    opt.value = name;
+                    opt.textContent = `${name} (${allStudents[name].lifetimePoints} Total Pts)`;
+                    if (name === currentStudentName) opt.selected = true;
+                    selectEl.appendChild(opt);
+                });
+            } else {
+                containerEl.classList.add('hidden');
+            }
+        }
+
+        function renderStudentTabs() {
+            const tabs = document.getElementById('studentTabs');
+            tabs.innerHTML = '';
+            Object.keys(allStudents).forEach(name => {
+                const st = allStudents[name];
+                const active = name === currentStudentName;
+                const btn = document.createElement('button');
+                btn.className = 'whitespace-nowrap font-bold text-xs px-3 py-2 rounded-xl border transition flex items-center gap-2 ' +
+                    (active ? 'bg-indigo-600 text-white border-indigo-600 shadow-md' : 'bg-white text-gray-700 border-gray-200 hover:bg-indigo-50');
+                const label = document.createElement('span');
+                label.textContent = name;
+                const info = document.createElement('span');
+                info.className = 'text-[10px] font-semibold px-2 py-0.5 rounded-full ' + (active ? 'bg-white/20 text-white' : 'bg-amber-100 text-amber-700');
+                info.textContent = `${st.lifetimePoints} pts · ${st.stickers.length} stickers`;
+                btn.appendChild(label);
+                btn.appendChild(info);
+                btn.onclick = () => switchStudent(name);
+                tabs.appendChild(btn);
+            });
+        }
+
+        function switchStudent(name) {
+            if (!allStudents[name] || name === currentStudentName) return;
+            playSound('click');
+            currentStudentName = name;
+            allStudents[name].isNew = false;
+            try { localStorage.setItem('active_student_name', name); } catch (err) {}
+            saveStudentsDB();
+            updateUI();
+        }
+
+        function selectExistingStudentDropdown(name) {
+            if (name) {
+                document.getElementById('studentNameInput').value = name;
+            }
+        }
+
+        function handleStudentSubmit() {
+            const nameInput = document.getElementById('studentNameInput').value.trim();
+            if (!nameInput) {
+                alert('Please enter a valid student name!');
+                return;
+            }
+
+            playSound('click');
+            currentStudentName = nameInput;
+
+            // Check if student is new or existing
+            if (!allStudents[currentStudentName]) {
+                allStudents[currentStudentName] = {
+                    isNew: true,
+                    currentPoints: 0,
+                    lifetimePoints: 0,
+                    sessionSubmitted: false,
+                    stickers: [],
+                    pendingStickers: [],
+                    lifetimeOnSubmit: true
+                };
+            } else {
+                allStudents[currentStudentName].isNew = false;
+            }
+
+            try { localStorage.setItem('active_student_name', currentStudentName); } catch (err) {}
+            saveStudentsDB();
+
+            document.getElementById('studentModal').classList.add('hidden');
+            updateUI();
+        }
+
+        function openStudentModal() {
+            playSound('click');
+            checkExistingStudentsDropdown();
+            document.getElementById('studentNameInput').value = currentStudentName || '';
+            document.getElementById('studentModal').classList.remove('hidden');
+        }
+
+        function deleteCurrentStudent() {
+            if (!currentStudentName || !allStudents[currentStudentName]) return;
+            
+            playSound('click');
+            if (confirm(`Are you sure you want to delete profile "${currentStudentName}"? This will remove all their points and sticker vault permanently.`)) {
+                delete allStudents[currentStudentName];
+                try { localStorage.removeItem('active_student_name'); } catch (err) {}
+                currentStudentName = '';
+                saveStudentsDB();
+                renderStudentTabs();
+                openStudentModal();
+            }
+        }
+
+        function getActiveStudent() {
+            if (!currentStudentName || !allStudents[currentStudentName]) {
+                currentStudentName = 'Naya';
+                allStudents[currentStudentName] = {
+                    isNew: true,
+                    currentPoints: 0,
+                    lifetimePoints: 0,
+                    sessionSubmitted: false,
+                    stickers: [],
+                    pendingStickers: [],
+                    lifetimeOnSubmit: true
+                };
+            }
+            if (!Array.isArray(allStudents[currentStudentName].pendingStickers)) {
+                allStudents[currentStudentName].pendingStickers = [];
+            }
+            return allStudents[currentStudentName];
+        }
+
+        let saveErrorShown = false;
+        function saveStudentsDB() {
+            try {
+                localStorage.setItem('all_students_db', JSON.stringify(allStudents));
+                saveErrorShown = false;
+            } catch (err) {
+                if (!saveErrorShown) {
+                    saveErrorShown = true;
+                    alert('Could not save the data (browser storage is full or blocked). Please use the Backup button to keep a copy of your data.');
+                }
+            }
+        }
+
+        // Backup & Restore (a copy of all students' data as a file)
+        function exportBackup() {
+            playSound('click');
+            const data = { students: allStudents, activeStudent: currentStudentName };
+            const blob = new Blob([JSON.stringify(data)], { type: 'application/json' });
+            const a = document.createElement('a');
+            a.href = URL.createObjectURL(blob);
+            a.download = 'reward_system_backup.json';
+            document.body.appendChild(a);
+            a.click();
+            a.remove();
+            setTimeout(() => URL.revokeObjectURL(a.href), 1000);
+        }
+
+        function triggerRestore() {
+            playSound('click');
+            document.getElementById('restoreFileInput').click();
+        }
+
+        function importBackup(event) {
+            const file = event.target.files[0];
+            if (!file) return;
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                try {
+                    const data = JSON.parse(e.target.result);
+                    if (!data || typeof data.students !== 'object' || Array.isArray(data.students)) throw new Error('bad file');
+                    if (!confirm('Restore this backup? It will replace the data currently saved in this browser.')) return;
+                    Object.values(data.students).forEach(normalizeStudent);
+                    allStudents = data.students;
+                    currentStudentName = allStudents[data.activeStudent] ? data.activeStudent : '';
+                    try { localStorage.setItem('active_student_name', currentStudentName); } catch (err) {}
+                    saveStudentsDB();
+                    checkExistingStudentsDropdown();
+                    if (currentStudentName) {
+                        document.getElementById('studentModal').classList.add('hidden');
+                        updateUI();
+                    } else {
+                        openStudentModal();
+                    }
+                } catch (err) {
+                    alert('This file is not a valid backup file.');
+                }
+                event.target.value = '';
+            };
+            reader.readAsText(file);
+        }
+
+        function getActiveSessionSticker(student) {
+            // The next sticker waiting in the locked slot (only stickers uploaded from the device)
+            return student.pendingStickers.length > 0 ? student.pendingStickers[0] : null;
+        }
+
+        function updateUI() {
+            const student = getActiveStudent();
+
+            document.getElementById('currentStudentNameDisplay').innerText = currentStudentName;
+            
+            const badgeEl = document.getElementById('studentStatusBadge');
+            if (student.isNew) {
+                badgeEl.innerText = 'New Student 🎉';
+                badgeEl.className = 'text-emerald-600 font-bold';
+            } else {
+                badgeEl.innerText = 'Existing Student';
+                badgeEl.className = 'text-purple-600 font-bold';
+            }
+
+            renderStudentTabs();
+
+            document.getElementById('currentPoints').innerText = student.currentPoints;
+            document.getElementById('lifetimePointsDisplay').innerText = student.lifetimePoints;
+            document.getElementById('inventoryCount').innerText = `${student.stickers.length} Unlocked`;
+
+            // Session Sticker preview card (always blurred + locked until the student submits with 35+)
+            const activeSticker = getActiveSessionSticker(student);
+            const previewImg = document.getElementById('currentSessionStickerImg');
+            const previewTitle = document.getElementById('currentSessionStickerTitle');
+            const lockedOverlayText = document.getElementById('lockedOverlayText');
+
+            if (activeSticker) {
+                previewImg.src = activeSticker.url;
+                previewImg.classList.remove('hidden');
+                previewImg.classList.add('filter', 'blur-sm');
+                previewTitle.innerText = 'Mystery Reward Sticker';
+                lockedOverlayText.innerText = 'Locked (Target: 35+)';
+            } else {
+                previewImg.removeAttribute('src');
+                previewImg.classList.add('hidden');
+                previewTitle.innerText = 'No reward sticker added yet';
+                lockedOverlayText.innerText = 'Add a sticker from your device';
+            }
+
+            // Render Sticker Vault with delete button per sticker
+            const inventoryContainer = document.getElementById('stickerInventory');
+            inventoryContainer.innerHTML = '';
+
+            if (student.stickers.length === 0) {
+                inventoryContainer.innerHTML = `
+                    <div class="col-span-2 py-8 text-center text-gray-400 text-xs">
+                        <i class="fa-solid fa-box-open text-2xl mb-1"></i><br>
+                        Vault is empty. Unlocked stickers will appear here!
+                    </div>
+                `;
+            } else {
+                student.stickers.forEach((sticker, idx) => {
+                    const item = document.createElement('div');
+                    item.className = 'bg-white p-3 rounded-2xl border border-gray-200 flex flex-col items-center justify-between text-center shadow-sm relative group';
+                    item.innerHTML = `
+                        <button onclick="deleteStudentSticker(${idx})" class="absolute top-2 right-2 w-6 h-6 bg-rose-100 text-rose-500 hover:bg-rose-500 hover:text-white rounded-full flex items-center justify-center text-xs transition shadow-sm" title="Delete sticker">
+                            <i class="fa-solid fa-xmark"></i>
+                        </button>
+                        <img src="${sticker.url}" alt="${sticker.title}" class="w-16 h-16 object-contain mb-1 rounded-lg mt-1">
+                        <span class="text-[10px] font-bold text-gray-700 truncate w-full">${sticker.title}</span>
+                    `;
+                    inventoryContainer.appendChild(item);
+                });
+            }
+
+            saveStudentsDB();
+        }
+
+        function adjustPoints(amount) {
+            const student = getActiveStudent();
+            student.currentPoints = Math.max(0, student.currentPoints + amount);
+
+            if (amount > 0) playSound('add');
+            else playSound('click');
+            updateUI();
+        }
+
+        function addAchievement(points, name) {
+            const student = getActiveStudent();
+            student.currentPoints += points;
+            playSound('add');
+            updateUI();
+        }
+
+        function submitSession() {
+            playSound('click');
+            const student = getActiveStudent();
+            const modal = document.getElementById('resultModal');
+            const modalIconContainer = document.getElementById('modalIconContainer');
+            const modalTitle = document.getElementById('modalTitle');
+            const modalMessage = document.getElementById('modalMessage');
+            const modalStickerContainer = document.getElementById('modalStickerContainer');
+
+            modalStickerContainer.classList.add('hidden');
+
+            if (student.currentPoints >= 35) {
+                // No sticker waiting? Keep the points and ask the teacher to add one first.
+                if (student.pendingStickers.length === 0) {
+                    modalIconContainer.className = 'w-20 h-20 mx-auto rounded-full bg-indigo-100 text-indigo-600 flex items-center justify-center text-4xl mb-4 shadow-lg';
+                    modalIconContainer.innerHTML = '<i class="fa-solid fa-cloud-arrow-up"></i>';
+                    modalTitle.className = 'text-2xl sm:text-3xl font-black mb-2 text-indigo-700';
+                    modalTitle.innerText = 'No sticker added yet';
+                    modalMessage.innerText = `${currentStudentName} reached ${student.currentPoints} points! Please add a sticker from your device, then press Submit again. The points are kept.`;
+                    modal.classList.remove('hidden');
+                    updateUI();
+                    return;
+                }
+
+                playSound('success');
+                const earnedPoints = student.currentPoints;
+
+                confetti({
+                    particleCount: 120,
+                    spread: 80,
+                    origin: { y: 0.6 }
+                });
+
+                // Unlock the next sticker the teacher uploaded (the program never adds stickers by itself)
+                const earnedSticker = student.pendingStickers.shift();
+                student.stickers.push(earnedSticker);
+
+                // Points are added to Total Lifetime Points only now (on Submit), then the session box goes back to 0
+                student.lifetimePoints += earnedPoints;
+                student.currentPoints = 0;
+                student.sessionSubmitted = false;
+                updateUI();
+
+                document.getElementById('revealTitle').innerText = `Amazing Job, ${currentStudentName}!`;
+                document.getElementById('revealMessage').innerText = `You earned ${earnedPoints} points today and unlocked a reward sticker! Total Lifetime Points: ${student.lifetimePoints}.`;
+                document.getElementById('revealStickerImg').src = earnedSticker.url;
+                document.getElementById('stickerRevealOverlay').classList.remove('hidden');
+                return;
+
+            } else {
+                playSound('error');
+                // Submit also adds this session's points to Total Lifetime Points, then the session box goes back to 0
+                const sessionPoints = student.currentPoints;
+                student.lifetimePoints += sessionPoints;
+                student.currentPoints = 0;
+                student.sessionSubmitted = false;
+                modalIconContainer.className = 'w-20 h-20 mx-auto rounded-full bg-amber-100 text-amber-600 flex items-center justify-center text-4xl mb-4 shadow-lg';
+                modalIconContainer.innerHTML = '<i class="fa-solid fa-seedling"></i>';
+                modalTitle.className = 'text-2xl sm:text-3xl font-black mb-2 text-amber-700';
+                modalTitle.innerText = 'Better luck next time!';
+                modalMessage.innerText = `Points are less than 35 (${sessionPoints} points). They were added to your Total Lifetime Points (${student.lifetimePoints}). Keep trying hard in the next class!`;
+            }
+
+            modal.classList.remove('hidden');
+            updateUI();
+        }
+
+        function closeStickerReveal() {
+            playSound('click');
+            document.getElementById('stickerRevealOverlay').classList.add('hidden');
+        }
+
+        function closeModal() {
+            playSound('click');
+            document.getElementById('resultModal').classList.add('hidden');
+        }
+
+        function resetSessionPoints() {
+            playSound('click');
+            if (confirm('Are you sure you want to reset today\'s points for this student?')) {
+                const student = getActiveStudent();
+                student.currentPoints = 0;
+                student.sessionSubmitted = false;
+                updateUI();
+            }
+        }
+
+        // Custom Sticker Upload from Device Functions
+        function triggerDeviceUpload() {
+            playSound('click');
+            document.getElementById('deviceStickerFileInput').click();
+        }
+
+        function handleDeviceFileUpload(event) {
+            const file = event.target.files[0];
+            if (!file) return;
+
+            const reader = new FileReader();
+            reader.onload = function(e) {
+              compressStickerImage(e.target.result, function(base64Url) {
+                const stickerTitle = prompt('Enter a title for this sticker:', 'Custom Sticker') || 'Sticker Badge';
+
+                playSound('add');
+                const student = getActiveStudent();
+                const newSticker = {
+                    id: 'device_' + Date.now(),
+                    title: stickerTitle,
+                    url: base64Url
+                };
+
+                // Goes into the locked slot first; moves to the vault only after the student unlocks it
+                student.pendingStickers.push(newSticker);
+                saveStudentsDB();
+                updateUI();
+                event.target.value = ''; // Reset input
+              });
+            };
+            reader.readAsDataURL(file);
+        }
+
+        // Shrinks big photos (keeps transparency) so many stickers can be saved
+        function compressStickerImage(dataUrl, done) {
+            const img = new Image();
+            img.onload = function() {
+                const maxSize = 600;
+                const scale = Math.min(1, maxSize / Math.max(img.width, img.height));
+                const canvas = document.createElement('canvas');
+                canvas.width = Math.max(1, Math.round(img.width * scale));
+                canvas.height = Math.max(1, Math.round(img.height * scale));
+                canvas.getContext('2d').drawImage(img, 0, 0, canvas.width, canvas.height);
+                done(canvas.toDataURL('image/webp', 0.9));
+            };
+            img.onerror = function() { done(dataUrl); };
+            img.src = dataUrl;
+        }
+
+        function deleteStudentSticker(index) {
+            playSound('click');
+            const student = getActiveStudent();
+            if (confirm('Are you sure you want to delete this sticker from the student\'s vault?')) {
+                student.stickers.splice(index, 1);
+                saveStudentsDB();
+                updateUI();
+            }
+        }
+    </script>
+</body>
+</html>
